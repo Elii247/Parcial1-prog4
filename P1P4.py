@@ -1,128 +1,143 @@
-import sqlite3
-import sys
+import json
+import os
+
+# Nombre del archivo JSON donde se almacenarán los datos
+FILE_NAME = 'presupuesto.json'
 
 
-# Conexión a la base de datos SQLite
-def connect():
-    return sqlite3.connect('biblioteca.db')
+# Función para cargar los artículos del presupuesto desde el archivo JSON
+def cargar_articulos():
+    if not os.path.exists(FILE_NAME):
+        return []
+    with open(FILE_NAME, 'r') as archivo:
+        return json.load(archivo)
 
 
-# Creación de la tabla si no existe
-def crear_tabla():
-    conn = connect()
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS libros (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        titulo TEXT NOT NULL,
-                        autor TEXT NOT NULL,
-                        anio INTEGER NOT NULL
-                    )''')
-    conn.commit()
-    conn.close()
+# Función para guardar los artículos en el archivo JSON
+def guardar_articulos(articulos):
+    with open(FILE_NAME, 'w') as archivo:
+        json.dump(articulos, archivo, indent=4)
 
 
-# Agregar nuevo libro
-def agregar_libro():
-    titulo = input("Título del libro: ")
-    autor = input("Autor del libro: ")
-    anio = input("Año de publicación: ")
+# Función para agregar un nuevo artículo
+def agregar_articulo():
+    descripcion = input("Descripción del artículo: ")
+    cantidad = float(input("Cantidad: "))
+    categoria = input("Categoría: ")
 
-    conn = connect()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO libros (titulo, autor, anio) VALUES (?, ?, ?)", (titulo, autor, anio))
-    conn.commit()
-    conn.close()
-    print(f"Libro '{titulo}' agregado exitosamente.")
+    nuevo_articulo = {
+        'descripcion': descripcion,
+        'cantidad': cantidad,
+        'categoria': categoria
+    }
 
+    # Cargar los artículos existentes
+    articulos = cargar_articulos()
+    articulos.append(nuevo_articulo)
 
-# Actualizar libro existente
-def actualizar_libro():
-    id_libro = input("ID del libro a actualizar: ")
-    titulo = input("Nuevo título del libro: ")
-    autor = input("Nuevo autor del libro: ")
-    anio = input("Nuevo año de publicación: ")
-
-    conn = connect()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE libros SET titulo = ?, autor = ?, anio = ? WHERE id = ?", (titulo, autor, anio, id_libro))
-    conn.commit()
-    conn.close()
-    print(f"Libro ID '{id_libro}' actualizado exitosamente.")
+    # Guardar los artículos actualizados
+    guardar_articulos(articulos)
+    print(f"Artículo '{descripcion}' agregado exitosamente.")
 
 
-# Eliminar libro existente
-def eliminar_libro():
-    id_libro = input("ID del libro a eliminar: ")
+# Función para ver todos los artículos
+def ver_articulos():
+    articulos = cargar_articulos()
 
-    conn = connect()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM libros WHERE id = ?", (id_libro,))
-    conn.commit()
-    conn.close()
-    print(f"Libro ID '{id_libro}' eliminado exitosamente.")
-
-
-# Ver listado de libros
-def ver_libros():
-    conn = connect()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, titulo, autor, anio FROM libros")
-    libros = cursor.fetchall()
-    conn.close()
-
-    if libros:
-        print("Listado de libros:")
-        for libro in libros:
-            print(f"ID: {libro[0]}, Título: {libro[1]}, Autor: {libro[2]}, Año: {libro[3]}")
+    if articulos:
+        print("\n--- Listado de Artículos ---")
+        for idx, articulo in enumerate(articulos, 1):
+            print(
+                f"{idx}. Descripción: {articulo['descripcion']}, Cantidad: {articulo['cantidad']}, Categoría: {articulo['categoria']}")
     else:
-        print("No hay libros en la biblioteca.")
+        print("No hay artículos registrados en el presupuesto.")
 
 
-# Buscar libro por título
-def buscar_libro():
-    titulo = input("Título del libro a buscar: ")
+# Función para buscar artículos por descripción
+def buscar_articulo():
+    descripcion_busqueda = input("Ingrese la descripción del artículo a buscar: ").lower()
+    articulos = cargar_articulos()
 
-    conn = connect()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, autor, anio FROM libros WHERE titulo LIKE ?", ('%' + titulo + '%',))
-    libro = cursor.fetchall()
-    conn.close()
+    resultados = [articulo for articulo in articulos if descripcion_busqueda in articulo['descripcion'].lower()]
 
-    if libro:
-        print("Libros encontrados:")
-        for l in libro:
-            print(f"ID: {l[0]}, Autor: {l[1]}, Año: {l[2]}")
+    if resultados:
+        print(f"\n--- Resultados de la búsqueda para '{descripcion_busqueda}' ---")
+        for idx, articulo in enumerate(resultados, 1):
+            print(
+                f"{idx}. Descripción: {articulo['descripcion']}, Cantidad: {articulo['cantidad']}, Categoría: {articulo['categoria']}")
     else:
-        print("No se encontraron libros con ese título.")
+        print(f"No se encontraron artículos con la descripción '{descripcion_busqueda}'.")
 
 
-# Función principal del menú
+# Función para editar un artículo
+def editar_articulo():
+    ver_articulos()
+    articulos = cargar_articulos()
+
+    idx = int(input("\nIngrese el número del artículo que desea editar: ")) - 1
+
+    if 0 <= idx < len(articulos):
+        print("\n--- Edición de Artículo ---")
+        descripcion = input(f"Descripción actual ({articulos[idx]['descripcion']}): ") or articulos[idx]['descripcion']
+        cantidad = input(f"Cantidad actual ({articulos[idx]['cantidad']}): ")
+        categoria = input(f"Categoría actual ({articulos[idx]['categoria']}): ") or articulos[idx]['categoria']
+
+        if cantidad:
+            cantidad = float(cantidad)
+
+        articulos[idx] = {
+            'descripcion': descripcion,
+            'cantidad': cantidad if cantidad else articulos[idx]['cantidad'],
+            'categoria': categoria
+        }
+
+        guardar_articulos(articulos)
+        print(f"Artículo '{descripcion}' actualizado exitosamente.")
+    else:
+        print("Índice no válido.")
+
+
+# Función para eliminar un artículo
+def eliminar_articulo():
+    ver_articulos()
+    articulos = cargar_articulos()
+
+    idx = int(input("\nIngrese el número del artículo que desea eliminar: ")) - 1
+
+    if 0 <= idx < len(articulos):
+        articulo_eliminado = articulos.pop(idx)
+        guardar_articulos(articulos)
+        print(f"Artículo '{articulo_eliminado['descripcion']}' eliminado exitosamente.")
+    else:
+        print("Índice no válido.")
+
+
+# Función del menú principal
 def menu():
-    crear_tabla()  # Asegurar que la tabla de libros exista
     while True:
-        print("\n--- Biblioteca de Libros ---")
-        print("1. Agregar nuevo libro")
-        print("2. Actualizar libro existente")
-        print("3. Eliminar libro existente")
-        print("4. Ver listado de libros")
-        print("5. Buscar libro por título")
+        print("\n--- Sistema de Registro de Presupuesto ---")
+        print("1. Agregar nuevo artículo")
+        print("2. Ver todos los artículos")
+        print("3. Buscar artículo por descripción")
+        print("4. Editar artículo")
+        print("5. Eliminar artículo")
         print("6. Salir")
 
         opcion = input("Seleccione una opción: ")
 
         if opcion == '1':
-            agregar_libro()
+            agregar_articulo()
         elif opcion == '2':
-            actualizar_libro()
+            ver_articulos()
         elif opcion == '3':
-            eliminar_libro()
+            buscar_articulo()
         elif opcion == '4':
-            ver_libros()
+            editar_articulo()
         elif opcion == '5':
-            buscar_libro()
+            eliminar_articulo()
         elif opcion == '6':
             print("Saliendo del programa...")
-            sys.exit()
+            break
         else:
             print("Opción no válida. Intente nuevamente.")
 
